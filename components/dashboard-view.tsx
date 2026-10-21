@@ -2,91 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { CalendarDays } from "lucide-react";
+import DashboardLoading from "@/components/dashboard/dashboard-loading";
+import { buildDailyBalance, type ApiResponse, type CashflowPoint, type DashboardSummary, type TransactionPage } from "@/components/dashboard/dashboard-data";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import CashflowChart from "@/components/dashboard/cashflow-chart";
-import DailyBalanceChart, { type DailyBalancePoint } from "@/components/dashboard/daily-balance-chart";
+import DailyBalanceChart from "@/components/dashboard/daily-balance-chart";
+import type { DailyBalancePoint } from "@/components/dashboard/daily-balance-chart";
 import RecentTransactions from "@/components/dashboard/recent-transactions";
 import SummaryCards from "@/components/dashboard/summary-cards";
-import LoadingBar from "@/components/ui/loading-bar";
-
-type ApiResponse<T> = {
-  success?: boolean;
-  message?: string;
-  data?: T;
-};
-
-type DashboardSummary = {
-  total_net_balance: number | string;
-  cashflow: {
-    current_month_income: number | string;
-    current_month_expense: number | string;
-    net_cash_flow: number | string;
-  };
-  accounts: { id: number; name: string; type: string; current_balance: number | string; color?: string | null }[];
-  recent_transactions: {
-    id: number;
-    type: "income" | "expense" | "transfer";
-    amount: number | string;
-    notes: string | null;
-    transaction_date: string;
-  }[];
-};
-
-type CashflowPoint = {
-  period: string;
-  income: number | string;
-  expense: number | string;
-  net: number | string;
-};
-
-type DashboardTransaction = {
-  account_id: number;
-  type: "income" | "expense" | "transfer";
-  amount: number | string;
-  transaction_date: string;
-};
-
-type TransactionPage = {
-  data: DashboardTransaction[];
-  last_page: number;
-};
-
-function buildDailyBalance(
-  balance: number,
-  activeAccountIds: Set<number>,
-  transactions: DashboardTransaction[],
-) {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const today = now.getDate();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const dailyNet = new Map<number, number>();
-
-  for (const transaction of transactions) {
-    if (
-      !activeAccountIds.has(transaction.account_id) ||
-      (transaction.type !== "income" && transaction.type !== "expense")
-    ) continue;
-
-    const day = Number(transaction.transaction_date.slice(8, 10));
-    const amount = Number(transaction.amount) * (transaction.type === "income" ? 1 : -1);
-    dailyNet.set(day, (dailyNet.get(day) ?? 0) + amount);
-  }
-
-  const netChange = [...dailyNet.values()].reduce((sum, amount) => sum + amount, 0);
-  let runningBalance = balance - netChange;
-  const data: DailyBalancePoint[] = [];
-
-  for (let day = 1; day <= daysInMonth; day += 1) {
-    const change = dailyNet.get(day) ?? 0;
-    if (day <= today) runningBalance += change;
-    data.push({ day, balance: day <= today ? runningBalance : null });
-  }
-
-  return { data, netChange };
-}
 
 export default function DashboardView() {
   const t = useTranslations("Dashboard");
@@ -180,97 +104,7 @@ export default function DashboardView() {
     return () => controller.abort();
   }, [attempt, router]);
 
-  if (status === "loading") {
-    return (
-      <div className="mx-auto w-full max-w-[1440px] px-5 py-5 sm:px-6" role="status" aria-busy="true">
-        <LoadingBar className="mb-4" />
-
-        {/* Title skeleton */}
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div className="space-y-1.5">
-            <div className="h-3 w-24 rounded-full bg-slate-200 animate-pulse" />
-            <div className="h-6 w-36 rounded-lg bg-slate-200 animate-pulse" />
-          </div>
-          <div className="h-8 w-28 rounded-full bg-slate-200 animate-pulse" />
-        </div>
-
-        <div className="space-y-4">
-          {/* Hero balance skeleton */}
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#122645] to-[#18355c] p-5 text-white shadow-sm border border-white/10">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="size-7 rounded-lg bg-white/10 animate-pulse" />
-                <div className="h-3 w-20 rounded-full bg-white/20 animate-pulse" />
-              </div>
-              <div className="size-6 rounded-lg bg-white/10 animate-pulse" />
-            </div>
-            <div className="mt-4 space-y-2">
-              <div className="h-8 w-48 rounded-lg bg-white/20 animate-pulse" />
-              <div className="h-3 w-32 rounded-full bg-white/10 animate-pulse" />
-            </div>
-          </div>
-
-          {/* Income & Expense sub-cards skeleton */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-2xl border border-border/80 bg-surface p-4 space-y-3">
-              <div className="size-7 rounded-lg bg-slate-200 animate-pulse" />
-              <div className="space-y-1.5">
-                <div className="h-3 w-16 rounded-full bg-slate-200 animate-pulse" />
-                <div className="h-5 w-24 rounded-lg bg-slate-200 animate-pulse" />
-              </div>
-            </div>
-            <div className="rounded-2xl border border-border/80 bg-surface p-4 space-y-3">
-              <div className="size-7 rounded-lg bg-slate-200 animate-pulse" />
-              <div className="space-y-1.5">
-                <div className="h-3 w-16 rounded-full bg-slate-200 animate-pulse" />
-                <div className="h-5 w-24 rounded-lg bg-slate-200 animate-pulse" />
-              </div>
-            </div>
-          </div>
-
-          {/* Chart & Recent transactions skeleton */}
-          <div className="grid gap-4 @xl/app:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.9fr)]">
-            <div className="rounded-2xl border border-border/80 bg-surface p-5 space-y-4">
-              <div className="flex justify-between items-center">
-                <div className="h-4 w-32 rounded-full bg-slate-200 animate-pulse" />
-                <div className="h-4 w-20 rounded-full bg-slate-200 animate-pulse" />
-              </div>
-              <div className="flex h-44 items-end justify-between gap-3 pt-4">
-                {[40, 70, 30, 85, 50, 95].map((h, i) => (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-2 h-full justify-end">
-                    <div
-                      className="w-full max-w-[24px] rounded-full bg-slate-100 animate-pulse"
-                      style={{ height: `${h}%` }}
-                    />
-                    <div className="h-2.5 w-6 rounded-full bg-slate-200 animate-pulse" />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-border/80 bg-surface p-5 space-y-3">
-              <div className="flex justify-between items-center">
-                <div className="h-4 w-28 rounded-full bg-slate-200 animate-pulse" />
-                <div className="h-3 w-16 rounded-full bg-slate-200 animate-pulse" />
-              </div>
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex items-center justify-between p-3 rounded-xl border border-border/50 bg-background/50">
-                  <div className="flex items-center gap-3">
-                    <div className="size-9 rounded-xl bg-slate-200 animate-pulse" />
-                    <div className="space-y-1.5">
-                      <div className="h-3.5 w-24 rounded-full bg-slate-200 animate-pulse" />
-                      <div className="h-2.5 w-16 rounded-full bg-slate-200 animate-pulse" />
-                    </div>
-                  </div>
-                  <div className="h-4 w-16 rounded-lg bg-slate-200 animate-pulse" />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (status === "loading") return <DashboardLoading />;
 
   if (status === "error" || !summary) {
     return (

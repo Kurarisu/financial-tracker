@@ -42,6 +42,14 @@ npm run dev
 
 Open [http://localhost:3001](http://localhost:3001).
 
+To run the frontend in Docker instead, use:
+
+```bash
+docker compose up
+```
+
+The Compose service expects the Laravel API on the host at `http://localhost:8000`. Set `API_BASE_URL` or `NEXT_PUBLIC_API_URL` in `.env` to override the defaults.
+
 ## Other commands
 
 ```bash

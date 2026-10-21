@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import AccountForm from "@/components/account-form";
 import CashBalanceSetup from "@/components/cash-balance-setup";
+import AppRouteLayout from "@/components/app-route-layout";
 
 function NewAccountContent() {
   const searchParams = useSearchParams();
@@ -12,8 +13,10 @@ function NewAccountContent() {
 
 export default function NewAccountPage() {
   return (
-    <Suspense>
-      <NewAccountContent />
-    </Suspense>
+    <AppRouteLayout>
+      <Suspense>
+        <NewAccountContent />
+      </Suspense>
+    </AppRouteLayout>
   );
 }

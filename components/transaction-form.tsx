@@ -1,0 +1,341 @@
+"use client";
+
+import { ArrowLeft, Loader2 } from "lucide-react";
+import LoadingBar from "@/components/ui/loading-bar";
+import { useEffect, useState } from "react";
+import { Link, useRouter } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
+import { formatMoneyInput, parseMoneyInput } from "@/lib/money-input";
+
+type Account = { id: number; name: string; type?: string; account_number?: string | null };
+type Category = { id: number; name: string; type?: string };
+
+const initialForm = {
+  type: "expense",
+  amount: "",
+  transaction_date: new Date().toISOString().slice(0, 10),
+  account_id: "",
+  category_id: "",
+  to_account_id: "",
+  notes: "",
+};
+
+export default function TransactionForm() {
+  const t = useTranslations("Transactions");
+  const router = useRouter();
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [loadingOptions, setLoadingOptions] = useState(true);
+  const [error, setError] = useState("");
+  const [form, setForm] = useState(initialForm);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const token = sessionStorage.getItem("auth_token");
+
+    if (!token) {
+      router.replace("/login");
+      return () => controller.abort();
+    }
+
+    async function loadOptions() {
+      try {
+        setLoadingOptions(true);
+        setError("");
+        const [accountsResponse, categoriesResponse] = await Promise.all([
+          fetch("/api/accounts", {
+            headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+            signal: controller.signal,
+          }),
+          fetch(`/api/categories?type=${encodeURIComponent(form.type)}&include_defaults=1`, {
+            headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+            signal: controller.signal,
+          }),
+        ]);
+
+        if (controller.signal.aborted) return;
+
+        if (accountsResponse.status === 401 || categoriesResponse.status === 401) {
+          sessionStorage.removeItem("auth_token");
+          router.replace("/login");
+          return;
+        }
+
+        const [accountsPayload, categoriesPayload] = await Promise.all([
+          accountsResponse.json() as Promise<{
+            success?: boolean;
+            message?: string;
+            data?: { accounts?: Account[] };
+          }>,
+          categoriesResponse.json() as Promise<{
+            success?: boolean;
+            message?: string;
+            data?: Category[];
+          }>,
+        ]);
+
+        if (controller.signal.aborted) return;
+        if (!accountsResponse.ok || !accountsPayload.success) {
+          throw new Error(accountsPayload.message ?? "Unable to load account and category data.");
+        }
+        if (!categoriesResponse.ok || !categoriesPayload.success) {
+          throw new Error(categoriesPayload.message ?? "Unable to load account and category data.");
+        }
+
+        const nextAccounts = accountsPayload?.data?.accounts ?? accountsPayload?.data ?? [];
+        const nextCategories = categoriesPayload?.data ?? [];
+
+        setAccounts(Array.isArray(nextAccounts) ? nextAccounts : []);
+        setCategories(Array.isArray(nextCategories) ? nextCategories : []);
+        setError("");
+      } catch (loadError) {
+        if (
+          controller.signal.aborted ||
+          (loadError instanceof Error && loadError.name === "AbortError")
+        ) {
+          return;
+        }
+
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load account and category data.",
+        );
+      } finally {
+        if (!controller.signal.aborted) setLoadingOptions(false);
+      }
+    }
+
+    void loadOptions();
+    return () => controller.abort();
+  }, [form.type, router]);
+
+  function updateField(field: keyof typeof initialForm, value: string) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const token = sessionStorage.getItem("auth_token");
+
+    if (!token) {
+      router.replace("/login");
+      return;
+    }
+
+    const safeAmount = parseMoneyInput(form.amount);
+
+    if (!form.transaction_date || !Number.isFinite(safeAmount) || safeAmount <= 0) {
+      setError(t("validationAmount"));
+      return;
+    }
+
+    if (form.type === "transfer") {
+      if (!form.account_id || !form.to_account_id || String(form.account_id) === String(form.to_account_id)) {
+        setError(t("validationTransfer"));
+        return;
+      }
+    } else if (!form.account_id || !form.category_id) {
+      setError(t("validationCategory"));
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+
+    const payload = {
+      type: form.type,
+      amount: safeAmount,
+      transaction_date: form.transaction_date,
+      notes: form.notes.trim() || null,
+      account_id: form.type === "transfer" ? Number(form.account_id) : Number(form.account_id),
+      category_id: form.type === "transfer" ? undefined : Number(form.category_id),
+      to_account_id: form.type === "transfer" ? Number(form.to_account_id) : undefined,
+    };
+
+    try {
+      const response = await fetch("/api/transactions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = (await response.json()) as { success?: boolean; message?: string; errors?: Record<string, string[]> };
+
+      if (!response.ok || !result.success) {
+        const validationError = result.errors
+          ? Object.values(result.errors).flat().join(" ")
+          : result.message ?? "Unable to save transaction.";
+        throw new Error(validationError);
+      }
+
+      router.replace("/transactions");
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "Unable to save transaction.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const isTransfer = form.type === "transfer";
+
+  return (
+    <div className="mx-auto w-full max-w-[820px] px-5 py-7 @sm/app:px-8 @sm/app:py-9">
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+            {t("workspace")}
+          </p>
+          <h2 className="text-2xl font-semibold tracking-normal @sm/app:text-[28px]">
+            {t("newTransaction")}
+          </h2>
+        </div>
+        <Link
+          className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground"
+          href="/transactions"
+        >
+          <ArrowLeft aria-hidden="true" className="size-4" />
+          {t("back")}
+        </Link>
+      </div>
+
+      <form className="space-y-5 rounded-md border border-border bg-surface p-5 @sm/app:p-6" onSubmit={handleSubmit}>
+        {(loadingOptions || saving) && <LoadingBar className="mb-2" />}
+        {error ? (
+          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error}
+          </div>
+        ) : null}
+
+        <div className="grid gap-5 @md/app:grid-cols-2">
+          <label className="space-y-2 text-sm font-medium text-foreground">
+            <span>{t("type")}</span>
+            <select
+              className="h-11 w-full rounded-md border border-border bg-background px-3 text-sm outline-none"
+              onChange={(event) => updateField("type", event.target.value)}
+              value={form.type}
+            >
+              <option value="expense">{t("filterExpense")}</option>
+              <option value="income">{t("filterIncome")}</option>
+              <option value="transfer">{t("filterTransfer")}</option>
+            </select>
+          </label>
+
+          <label className="space-y-2 text-sm font-medium text-foreground">
+            <span>{t("amount")}</span>
+            <input
+              className="h-11 w-full rounded-md border border-border bg-background px-3 text-sm outline-none"
+              inputMode="decimal"
+              onChange={(event) => updateField("amount", formatMoneyInput(event.target.value))}
+              placeholder="0"
+              type="text"
+              value={form.amount}
+            />
+          </label>
+        </div>
+
+        <div className="grid gap-5 @md/app:grid-cols-2">
+          <label className="space-y-2 text-sm font-medium text-foreground">
+            <span>{t("transactionDate")}</span>
+            <input
+              className="h-11 w-full rounded-md border border-border bg-background px-3 text-sm outline-none"
+              onChange={(event) => updateField("transaction_date", event.target.value)}
+              type="date"
+              value={form.transaction_date}
+            />
+          </label>
+
+          <label className="space-y-2 text-sm font-medium text-foreground">
+            <span>{isTransfer ? t("sourceAccount") : t("account")}</span>
+            <select
+              className="h-11 w-full rounded-md border border-border bg-background px-3 text-sm outline-none"
+              onChange={(event) => updateField("account_id", event.target.value)}
+              value={form.account_id}
+            >
+              <option value="">{t("selectAccount")}</option>
+              {accounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {isTransfer ? (
+          <label className="block space-y-2 text-sm font-medium text-foreground">
+            <span>{t("destinationAccount")}</span>
+            <select
+              className="h-11 w-full rounded-md border border-border bg-background px-3 text-sm outline-none"
+              onChange={(event) => updateField("to_account_id", event.target.value)}
+              value={form.to_account_id}
+            >
+              <option value="">{t("selectAccount")}</option>
+              {accounts
+                .filter((account) => String(account.id) !== String(form.account_id))
+                .map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+        ) : (
+          <label className="block space-y-2 text-sm font-medium text-foreground">
+            <span>{t("category")}</span>
+            <select
+              className="h-11 w-full rounded-md border border-border bg-background px-3 text-sm outline-none"
+              onChange={(event) => updateField("category_id", event.target.value)}
+              disabled={categories.length === 0}
+              value={form.category_id}
+            >
+              <option value="">{categories.length === 0 ? t("noCategories") : t("selectCategory")}</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+            {categories.length === 0 ? (
+              <p className="text-xs font-normal text-muted">
+                {t("createCategoryFirst")} <Link className="font-semibold text-primary underline underline-offset-2" href="/categories">{t("createCategoryLink")}</Link>
+              </p>
+            ) : null}
+          </label>
+        )}
+
+        <label className="block space-y-2 text-sm font-medium text-foreground">
+          <span>{t("notes")}</span>
+          <textarea
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
+            onChange={(event) => updateField("notes", event.target.value)}
+            rows={4}
+            value={form.notes}
+          />
+        </label>
+
+        <div className="flex justify-end gap-3 pt-2">
+          <Link
+            className="inline-flex h-10 items-center rounded-md border border-border bg-background px-4 text-sm font-medium text-foreground"
+            href="/transactions"
+          >
+            {t("cancel")}
+          </Link>
+          <button
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-brand px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+            disabled={saving || loadingOptions}
+            type="submit"
+          >
+            {saving && <Loader2 className="size-4 animate-spin" />}
+            {saving ? t("saving") : t("saveTransaction")}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}

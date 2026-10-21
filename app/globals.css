@@ -1,26 +1,82 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f5f7f8;
+  --surface: #ffffff;
+  --foreground: #1b2f49;
+  --muted: #66758a;
+  --border: #e2e8f0;
+  --primary: #19365e;
+  --primary-hover: #122a49;
+  --primary-soft: #edf2f7;
+  --brand: #16a879;
+  --brand-hover: #128b64;
+  --brand-soft: #e9f7f1;
+  --income: #168c64;
+  --income-soft: #e9f7f1;
+  --expense: #c9574e;
+  --expense-soft: #fff0ed;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-soft: var(--brand-soft);
+  --color-income: var(--income);
+  --color-income-soft: var(--income-soft);
+  --color-expense: var(--expense);
+  --color-expense-soft: var(--expense-soft);
   --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
 }
 
 body {
+  min-height: 100%;
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), sans-serif;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-more-menu {
+  right: max(12px, calc((100vw - 430px) / 2 + 12px));
+}
+
+::selection {
+  background: var(--brand-soft);
+  color: var(--primary);
+}
+
+@keyframes indeterminate {
+  0% {
+    left: -40%;
+    width: 35%;
+  }
+  50% {
+    left: 30%;
+    width: 55%;
+  }
+  100% {
+    left: 105%;
+    width: 40%;
+  }
+}
+
+.animate-indeterminate {
+  animation: indeterminate 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }

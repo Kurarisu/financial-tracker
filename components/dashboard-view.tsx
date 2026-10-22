@@ -161,7 +161,7 @@ export default function DashboardView() {
           netChange={monthNetChange}
         />
 
-        <div className="grid gap-4 @xl/app:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.9fr)]">
+        <div className="grid min-w-0 grid-cols-1 gap-4 @xl/app:grid-cols-[minmax(0,1.55fr)_minmax(0,0.9fr)]">
           <CashflowChart data={cashflow} />
           <RecentTransactions transactions={summary.recent_transactions} />
         </div>

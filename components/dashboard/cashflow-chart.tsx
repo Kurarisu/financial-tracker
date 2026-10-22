@@ -31,7 +31,7 @@ export default function CashflowChart({ data }: { data: CashflowPoint[] }) {
   );
 
   return (
-    <section className="rounded-2xl border border-border/80 bg-surface p-5 shadow-xs">
+    <section className="min-w-0 w-full max-w-full overflow-hidden rounded-2xl border border-border/80 bg-surface p-4 shadow-xs sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
@@ -57,7 +57,7 @@ export default function CashflowChart({ data }: { data: CashflowPoint[] }) {
           <p className="mt-1 text-xs text-muted/80">{t("cashFlowHint")}</p>
         </div>
       ) : (
-        <div className="mt-6 flex h-48 items-end gap-2.5 sm:gap-3">
+        <div className="mt-6 flex h-48 min-w-0 w-full items-end gap-2 sm:gap-3">
           {data.map((point) => {
             const income = Number(point.income);
             const expense = Number(point.expense);
@@ -67,7 +67,7 @@ export default function CashflowChart({ data }: { data: CashflowPoint[] }) {
             return (
               <div
                 key={point.period}
-                className="group flex h-full flex-1 flex-col items-center gap-2"
+                className="group flex h-full min-w-0 flex-1 flex-col items-center gap-2"
               >
                 <div className="relative flex min-h-0 w-full flex-1 items-end justify-center gap-1.5 rounded-xl bg-slate-50/80 p-1">
                   {/* Income bar */}

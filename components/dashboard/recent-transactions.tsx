@@ -34,7 +34,7 @@ export default function RecentTransactions({
   });
 
   return (
-    <section className="rounded-2xl border border-border/80 bg-surface p-5 shadow-xs">
+    <section className="min-w-0 w-full max-w-full overflow-hidden rounded-2xl border border-border/80 bg-surface p-4 shadow-xs sm:p-5">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
@@ -61,7 +61,7 @@ export default function RecentTransactions({
       {transactions.length === 0 ? (
         <p className="mt-6 text-center text-sm text-muted py-6">{t("emptyTransactions")}</p>
       ) : (
-        <div className="mt-4 space-y-2.5">
+        <div className="mt-4 min-w-0 space-y-2.5">
           {transactions.slice(0, 4).map((transaction) => {
             const amount = Number(transaction.amount);
             const isIncome = transaction.type === "income";
@@ -69,7 +69,7 @@ export default function RecentTransactions({
 
             return (
               <div
-                className="flex items-center justify-between gap-3 rounded-xl border
+                className="flex min-w-0 items-center justify-between gap-2 rounded-xl border
                   border-border/60 bg-background/60 p-3 transition-colors hover:bg-background"
                 key={transaction.id}
               >

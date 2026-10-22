@@ -5,6 +5,7 @@ import LoadingBar from "@/components/ui/loading-bar";
 import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { formatMoneyInput } from "@/lib/money-input";
+import type { ReactNode } from "react";
 
 type Account = { id: number; name: string; type?: string; account_number?: string | null };
 type Category = { id: number; name: string; type?: string };
@@ -27,6 +28,9 @@ export default function TransactionFields({
   error,
   onFieldChange,
   onSubmit,
+  receiptSection,
+  submitLabel,
+  isUpdate = false,
 }: {
   accounts: Account[];
   categories: Category[];
@@ -36,6 +40,9 @@ export default function TransactionFields({
   error: string;
   onFieldChange: (field: keyof TransactionFormValues, value: string) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+  receiptSection: ReactNode;
+  submitLabel?: string;
+  isUpdate?: boolean;
 }) {
   const t = useTranslations("Transactions");
   const isTransfer = form.type === "transfer";
@@ -156,6 +163,8 @@ export default function TransactionFields({
           />
         </label>
 
+        {receiptSection}
+
         <div className="flex justify-end gap-3 pt-2">
           <Link
             className="inline-flex h-10 items-center rounded-md border border-border bg-background px-4 text-sm font-medium text-foreground"
@@ -164,12 +173,12 @@ export default function TransactionFields({
             {t("cancel")}
           </Link>
           <button
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-brand px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+            className={`inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-semibold text-white shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer ${isUpdate ? "bg-primary hover:bg-primary-hover" : "bg-brand hover:bg-brand-hover"}`}
             disabled={saving || loadingOptions}
             type="submit"
           >
             {saving && <Loader2 className="size-4 animate-spin" />}
-            {saving ? t("saving") : t("saveTransaction")}
+            {saving ? t("saving") : submitLabel ?? t("saveTransaction")}
           </button>
         </div>
     </form>

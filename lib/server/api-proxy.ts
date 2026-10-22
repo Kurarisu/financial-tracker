@@ -7,7 +7,7 @@ const API_BASE_URL = (
 async function proxyApiRequest(
   request: Request,
   endpoint: string,
-  method: "GET" | "POST" | "PUT",
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
 ) {
   const authorization = request.headers.get("authorization");
 
@@ -56,4 +56,12 @@ export function proxyApiPost(request: Request, endpoint: string) {
 
 export function proxyApiPut(request: Request, endpoint: string) {
   return proxyApiRequest(request, endpoint, "PUT");
+}
+
+export function proxyApiPatch(request: Request, endpoint: string) {
+  return proxyApiRequest(request, endpoint, "PATCH");
+}
+
+export function proxyApiDelete(request: Request, endpoint: string) {
+  return proxyApiRequest(request, endpoint, "DELETE");
 }

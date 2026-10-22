@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useTranslations } from "next-intl";
+import { ChevronDown, Pencil, SlidersHorizontal, X } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { formatCurrency, normalizeTransactionType } from "@/lib/finance-helpers.mjs";
 import LoadingBar from "@/components/ui/loading-bar";
 
@@ -17,14 +18,36 @@ type TransactionRecord = {
   account?: { name?: string } | null;
   category?: { name?: string } | null;
   to_account?: { name?: string } | null;
+  account_id?: number | string;
+  category_id?: number | string | null;
+  to_account_id?: number | string | null;
 };
+
+type FilterOption = { id: number; name: string };
+type TransactionPage = { data?: TransactionRecord[]; last_page?: number };
+type TransactionPayload = {
+  success?: boolean;
+  message?: string;
+  data?: TransactionRecord[] | TransactionPage;
+};
+
+type SortOption = "date-desc" | "date-asc" | "amount-desc" | "amount-asc" | "description-asc";
 
 export default function TransactionsView() {
   const t = useTranslations("Transactions");
+  const locale = useLocale();
   const router = useRouter();
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
   const [selectedFilter, setSelectedFilter] = useState<"all" | "income" | "expense" | "transfer">("all");
   const [search, setSearch] = useState("");
+  const [accounts, setAccounts] = useState<FilterOption[]>([]);
+  const [categories, setCategories] = useState<FilterOption[]>([]);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [selectedAccount, setSelectedAccount] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [sortBy, setSortBy] = useState<SortOption>("date-desc");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -39,37 +62,66 @@ export default function TransactionsView() {
 
     async function loadTransactions() {
       try {
-        const response = await fetch("/api/transactions", {
-          headers: {
-            Accept: "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          signal: controller.signal,
-        });
+        const headers = { Accept: "application/json", Authorization: `Bearer ${token}` };
+        const [transactionsResponse, accountsResponse, categoriesResponse] = await Promise.all([
+          fetch("/api/transactions?per_page=100&page=1", { headers, signal: controller.signal }),
+          fetch("/api/accounts", { headers, signal: controller.signal }),
+          fetch("/api/categories", { headers, signal: controller.signal }),
+        ]);
 
-        if (response.status === 401) {
+        if ([transactionsResponse, accountsResponse, categoriesResponse].some((item) => item.status === 401)) {
           sessionStorage.removeItem("auth_token");
           router.replace("/login");
           return;
         }
 
-        const payload = (await response.json()) as {
-          success?: boolean;
-          message?: string;
-          data?: TransactionRecord[] | { data?: TransactionRecord[] };
-        };
+        const [transactionsPayload, accountsPayload, categoriesPayload] = await Promise.all([
+          transactionsResponse.json() as Promise<TransactionPayload>,
+          accountsResponse.json() as Promise<{ success?: boolean; message?: string; data?: FilterOption[] | { accounts?: FilterOption[] } }>,
+          categoriesResponse.json() as Promise<{ success?: boolean; message?: string; data?: FilterOption[] }>,
+        ]);
 
-        if (!response.ok || !payload.success) {
-          throw new Error(payload.message ?? "Unable to load transactions.");
+        if (!transactionsResponse.ok || !transactionsPayload.success) {
+          throw new Error(transactionsPayload.message ?? "Unable to load transactions.");
+        }
+        if (!accountsResponse.ok || !accountsPayload.success) {
+          throw new Error(accountsPayload.message ?? "Unable to load accounts.");
+        }
+        if (!categoriesResponse.ok || !categoriesPayload.success) {
+          throw new Error(categoriesPayload.message ?? "Unable to load categories.");
         }
 
-        const nextTransactions = Array.isArray(payload.data)
-          ? payload.data
-          : Array.isArray(payload.data?.data)
-            ? payload.data.data
-            : [];
+        const firstPage = Array.isArray(transactionsPayload.data)
+          ? transactionsPayload.data
+          : transactionsPayload.data?.data ?? [];
+        const lastPage = Array.isArray(transactionsPayload.data)
+          ? 1
+          : Math.max(1, Number(transactionsPayload.data?.last_page ?? 1));
+        const pageResponses = await Promise.all(
+          Array.from({ length: lastPage - 1 }, (_, index) =>
+            fetch(`/api/transactions?per_page=100&page=${index + 2}`, { headers, signal: controller.signal }),
+          ),
+        );
+        if (pageResponses.some((item) => item.status === 401)) {
+          sessionStorage.removeItem("auth_token");
+          router.replace("/login");
+          return;
+        }
+        const pagePayloads = await Promise.all(pageResponses.map((response) => response.json() as Promise<TransactionPayload>));
+        const nextTransactions = [
+          ...firstPage,
+          ...pagePayloads.flatMap((payload, index) => {
+            if (!pageResponses[index].ok || !payload.success) {
+              throw new Error(payload.message ?? "Unable to load transactions.");
+            }
+            return Array.isArray(payload.data) ? payload.data : payload.data?.data ?? [];
+          }),
+        ];
 
         setTransactions(nextTransactions);
+        const accountData = accountsPayload.data;
+        setAccounts(Array.isArray(accountData) ? accountData : accountData?.accounts ?? []);
+        setCategories(Array.isArray(categoriesPayload.data) ? categoriesPayload.data : []);
         setError("");
       } catch (loadError) {
         if (!controller.signal.aborted) {
@@ -86,6 +138,9 @@ export default function TransactionsView() {
     return () => controller.abort();
   }, [router]);
 
+  const selectedAccountName = accounts.find((account) => String(account.id) === selectedAccount)?.name;
+  const selectedCategoryName = categories.find((category) => String(category.id) === selectedCategory)?.name;
+
   const visibleTransactions = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
 
@@ -99,14 +154,59 @@ export default function TransactionsView() {
         transaction.to_account?.name,
         "",
       ].join(" ");
+      const transactionDate = transaction.transaction_date ?? transaction.date ?? "";
+      const matchesDate =
+        (!startDate || transactionDate.slice(0, 10) >= startDate) &&
+        (!endDate || transactionDate.slice(0, 10) <= endDate);
+      const matchesAccount =
+        !selectedAccount ||
+        String(transaction.account_id ?? "") === selectedAccount ||
+        String(transaction.to_account_id ?? "") === selectedAccount ||
+        transaction.account?.name === selectedAccountName ||
+        transaction.to_account?.name === selectedAccountName;
+      const matchesCategory =
+        !selectedCategory ||
+        String(transaction.category_id ?? "") === selectedCategory ||
+        transaction.category?.name === selectedCategoryName;
       const matchesSearch =
         normalizedSearch.length === 0 ||
         description.toLowerCase().includes(normalizedSearch) ||
         String(transaction.id).includes(normalizedSearch);
 
-      return matchesFilter && matchesSearch;
+      return matchesFilter && matchesSearch && matchesDate && matchesAccount && matchesCategory;
     });
-  }, [search, selectedFilter, transactions]);
+  }, [endDate, search, selectedAccount, selectedAccountName, selectedCategory, selectedCategoryName, selectedFilter, startDate, transactions]);
+
+  const sortedTransactions = useMemo(() => [...visibleTransactions].sort((left, right) => {
+    if (sortBy.startsWith("date")) {
+      const leftDate = (left.transaction_date ?? left.date ?? "").slice(0, 10);
+      const rightDate = (right.transaction_date ?? right.date ?? "").slice(0, 10);
+      return sortBy === "date-desc" ? rightDate.localeCompare(leftDate) : leftDate.localeCompare(rightDate);
+    }
+    if (sortBy.startsWith("amount")) {
+      const difference = Number(left.amount ?? 0) - Number(right.amount ?? 0);
+      return sortBy === "amount-desc" ? -difference : difference;
+    }
+    return (left.notes ?? "").localeCompare(right.notes ?? "", undefined, { sensitivity: "base" });
+  }), [sortBy, visibleTransactions]);
+
+  const activeFilterCount = [
+    search.trim(),
+    selectedFilter === "all" ? "" : selectedFilter,
+    startDate,
+    endDate,
+    selectedAccount,
+    selectedCategory,
+  ].filter(Boolean).length;
+
+  function clearFilters() {
+    setStartDate("");
+    setEndDate("");
+    setSelectedAccount("");
+    setSelectedCategory("");
+    setSelectedFilter("all");
+    setSearch("");
+  }
 
   return (
     <div className="mx-auto w-full max-w-[1440px] px-5 py-7 @sm/app:px-8 @sm/app:py-9">
@@ -131,11 +231,12 @@ export default function TransactionsView() {
       </div>
 
       <section className="rounded-md border border-border bg-surface p-4 @sm/app:p-5">
-        <div className="flex flex-col gap-3 @lg/app:flex-row @lg/app:items-center @lg/app:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="overflow-x-auto">
+          <div className="flex min-w-max items-center gap-2 pb-1">
             {(["all", "income", "expense", "transfer"] as const).map((filter) => (
               <button
-                className={`inline-flex h-9 items-center rounded-md px-3 text-sm font-medium ${
+                aria-pressed={selectedFilter === filter}
+                className={`inline-flex h-9 shrink-0 items-center rounded-md px-3 text-sm font-medium transition-colors ${
                   selectedFilter === filter
                     ? "bg-primary text-white"
                     : "border border-border bg-background text-muted"
@@ -148,18 +249,73 @@ export default function TransactionsView() {
               </button>
             ))}
           </div>
-
-          <label className="block w-full max-w-xs text-sm text-muted @lg/app:w-auto">
-            <span className="sr-only">{t("searchPlaceholder")}</span>
-            <input
-              className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/20"
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder={t("searchPlaceholder")}
-              type="search"
-              value={search}
-            />
-          </label>
         </div>
+
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+          <label className="min-w-0 flex-1">
+            <span className="sr-only">{t("searchPlaceholder")}</span>
+            <input className="h-11 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/20" onChange={(event) => setSearch(event.target.value)} placeholder={t("searchPlaceholder")} type="search" value={search} />
+          </label>
+          <button
+            aria-controls="transaction-filters"
+            aria-expanded={filtersOpen}
+            className={`inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium transition-colors ${filtersOpen || activeFilterCount > 0 ? "border-primary/30 bg-primary/5 text-primary" : "border-border bg-background text-foreground hover:bg-background/70"}`}
+            onClick={() => setFiltersOpen((open) => !open)}
+            type="button"
+          >
+            <SlidersHorizontal aria-hidden="true" className="size-4" />
+            {t("filters")}
+            {activeFilterCount > 0 && <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-xs text-white">{activeFilterCount}</span>}
+            <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${filtersOpen ? "rotate-180" : ""}`} />
+          </button>
+        </div>
+
+        {filtersOpen && (
+          <div className="mt-4 border-t border-border pt-4" id="transaction-filters">
+            <div className="grid gap-3 sm:grid-cols-2 @lg/app:grid-cols-4">
+              <label className="space-y-1.5 text-xs font-medium text-muted">
+                <span>{t("startDate")}</span>
+                <input className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground" onChange={(event) => setStartDate(event.target.value)} type="date" value={startDate} />
+              </label>
+              <label className="space-y-1.5 text-xs font-medium text-muted">
+                <span>{t("endDate")}</span>
+                <input className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground" onChange={(event) => setEndDate(event.target.value)} type="date" value={endDate} />
+              </label>
+              <label className="space-y-1.5 text-xs font-medium text-muted">
+                <span>{t("filterAccount")}</span>
+                <select className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground" onChange={(event) => setSelectedAccount(event.target.value)} value={selectedAccount}>
+                  <option value="">{t("allAccounts")}</option>
+                  {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
+                </select>
+              </label>
+              <label className="space-y-1.5 text-xs font-medium text-muted">
+                <span>{t("filterCategory")}</span>
+                <select className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground" onChange={(event) => setSelectedCategory(event.target.value)} value={selectedCategory}>
+                  <option value="">{t("allCategories")}</option>
+                  {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                </select>
+              </label>
+              <label className="space-y-1.5 text-xs font-medium text-muted sm:col-span-2 @lg/app:col-span-2">
+                <span>{t("sortBy")}</span>
+                <select className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground" onChange={(event) => setSortBy(event.target.value as SortOption)} value={sortBy}>
+                  <option value="date-desc">{t("sortDateNewest")}</option>
+                  <option value="date-asc">{t("sortDateOldest")}</option>
+                  <option value="amount-desc">{t("sortAmountHigh")}</option>
+                  <option value="amount-asc">{t("sortAmountLow")}</option>
+                  <option value="description-asc">{t("sortDescription")}</option>
+                </select>
+              </label>
+              {activeFilterCount > 0 && (
+                <div className="flex items-end sm:col-span-2 @lg/app:col-span-2 @lg/app:justify-end">
+                  <button className="inline-flex h-10 items-center gap-1.5 text-sm font-medium text-muted hover:text-foreground" onClick={clearFilters} type="button">
+                    <X aria-hidden="true" className="size-4" />
+                    {t("clearFilters")}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="mt-5 overflow-hidden rounded-md border border-border bg-surface">
@@ -204,7 +360,7 @@ export default function TransactionsView() {
             </div>
 
             <div className="divide-y divide-border">
-              {visibleTransactions.map((transaction) => {
+              {sortedTransactions.map((transaction) => {
                 const type = normalizeTransactionType(transaction.type);
                 const amount = Number(transaction.amount ?? 0);
                 const accountName =
@@ -242,7 +398,7 @@ export default function TransactionsView() {
 
                     <div className="text-sm text-muted">{accountName}</div>
                     <div className="text-sm text-muted">
-                      {new Date(transactionDate).toLocaleDateString("id-ID", {
+                      {new Date(transactionDate).toLocaleDateString(locale === "id" ? "id-ID" : "en-US", {
                         day: "2-digit",
                         month: "2-digit",
                         year: "numeric",
@@ -262,6 +418,15 @@ export default function TransactionsView() {
                         {type === "income" ? "+" : type === "expense" ? "-" : "↔ "}
                         {formatCurrency(amount)}
                       </p>
+                      <Link
+                        aria-label={`${t("edit")} ${description}`}
+                        className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                        href={`/transactions/${transaction.id}/edit`}
+                        title={t("edit")}
+                      >
+                        <Pencil aria-hidden="true" className="size-3.5" />
+                        {t("edit")}
+                      </Link>
                     </div>
                   </div>
                 );

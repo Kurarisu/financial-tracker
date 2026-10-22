@@ -1,9 +1,9 @@
 "use client";
 
 import { Activity, Ellipsis, House, Plus, UserRound, WalletCards } from "lucide-react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
-import { Link, usePathname, useRouter } from "@/i18n/navigation";
+import { Link, usePathname } from "@/i18n/navigation";
 
 const primaryLinks = [
   { href: "/", messageKey: "overview" },
@@ -11,11 +11,6 @@ const primaryLinks = [
   { href: "/accounts", messageKey: "accounts" },
   { href: "/categories", messageKey: "categories" },
   { href: "/reports", messageKey: "reports" },
-] as const;
-
-const languageOptions = [
-  { locale: "en", nameKey: "english", shortKey: "englishShort" },
-  { locale: "id", nameKey: "indonesian", shortKey: "indonesianShort" },
 ] as const;
 
 function isActivePath(pathname: string, href: string) {
@@ -30,17 +25,9 @@ export default function AppShell({
   children: React.ReactNode;
 }>) {
   const pathname = usePathname();
-  const locale = useLocale();
   const navigation = useTranslations("Navigation");
-  const language = useTranslations("Language");
   const actions = useTranslations("Actions");
   const [moreOpen, setMoreOpen] = useState(false);
-  const router = useRouter();
-
-  function handleLanguageChange(newLocale: string) {
-    document.cookie = `NEXT_LOCALE=${newLocale}; path=/; max-age=31536000; SameSite=Lax`;
-    router.refresh();
-  }
   const activeLink = primaryLinks.find((link) => isActivePath(pathname, link.href));
   const activeTitle = navigation(
     pathname === "/transactions/new"
@@ -76,29 +63,6 @@ export default function AppShell({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <div
-              aria-label={language("label")}
-              className="inline-flex h-8 items-center rounded-full border border-border/80 bg-background p-0.5"
-              role="group"
-            >
-              {languageOptions.map((option) => (
-                <button
-                  type="button"
-                  aria-current={locale === option.locale ? "page" : undefined}
-                  aria-label={language("select", { language: language(option.nameKey) })}
-                  className={`flex h-7 min-w-8 items-center justify-center rounded-full px-2 text-[11px] font-bold transition-all focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary cursor-pointer ${
-                    locale === option.locale
-                      ? "bg-primary text-white shadow-xs"
-                      : "text-muted hover:text-foreground"
-                  }`}
-                  key={option.locale}
-                  onClick={() => handleLanguageChange(option.locale)}
-                  title={language(option.nameKey)}
-                >
-                  {language(option.shortKey)}
-                </button>
-              ))}
-            </div>
             <Link
               aria-current={pathname === "/profile" ? "page" : undefined}
               aria-label={navigation("profile")}

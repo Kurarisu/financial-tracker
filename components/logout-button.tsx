@@ -32,7 +32,7 @@ export default function LogoutButton() {
 
   return (
     <button
-      className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-semibold text-foreground transition-colors hover:bg-background/70 disabled:cursor-wait disabled:opacity-60 cursor-pointer"
+      className="inline-flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-expense/25 bg-expense/5 px-2.5 text-xs font-semibold text-expense transition-colors duration-150 hover:bg-expense/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-expense disabled:cursor-wait disabled:opacity-60 cursor-pointer @sm/app:gap-2 @sm/app:px-3 @sm/app:text-sm"
       disabled={isLoggingOut}
       onClick={() => void handleLogout()}
       type="button"

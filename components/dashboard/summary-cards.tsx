@@ -19,7 +19,7 @@ type AccountBalance = {
   color?: string | null;
 };
 
-export default function SummaryCards({ values, accounts }: { values: SummaryValues; accounts: AccountBalance[] }) {
+export default function SummaryCards({ values, accounts, periodLabel, incomeChange, expenseChange }: { values: SummaryValues; accounts: AccountBalance[]; periodLabel: string; incomeChange: number | null; expenseChange: number | null }) {
   const t = useTranslations("Dashboard");
   const locale = useLocale();
   const [showBalance, setShowBalance] = useState(true);
@@ -88,7 +88,7 @@ export default function SummaryCards({ values, accounts }: { values: SummaryValu
               <ArrowDownLeft aria-hidden="true" className="size-3.5" />
             </span>
             <span className="truncate text-[10px] font-semibold uppercase tracking-wider text-emerald-700/80">
-              {t("thisMonth")}
+              {periodLabel}
             </span>
           </div>
           <div className="mt-2.5">
@@ -96,6 +96,7 @@ export default function SummaryCards({ values, accounts }: { values: SummaryValu
             <p className="mt-1 truncate text-base font-bold text-emerald-700 sm:text-lg tabular-nums">
               {currency.format(values.income)}
             </p>
+            {incomeChange !== null && <p className={`mt-1 text-[11px] font-medium ${incomeChange >= 0 ? "text-income" : "text-expense"}`}>{incomeChange > 0 ? "+" : ""}{incomeChange}% {t("vsLastMonth")}</p>}
           </div>
         </article>
 
@@ -106,7 +107,7 @@ export default function SummaryCards({ values, accounts }: { values: SummaryValu
               <ArrowUpRight aria-hidden="true" className="size-3.5" />
             </span>
             <span className="truncate text-[10px] font-semibold uppercase tracking-wider text-rose-700/80">
-              {t("thisMonth")}
+              {periodLabel}
             </span>
           </div>
           <div className="mt-2.5">
@@ -114,6 +115,7 @@ export default function SummaryCards({ values, accounts }: { values: SummaryValu
             <p className="mt-1 truncate text-base font-bold text-rose-700 sm:text-lg tabular-nums">
               {currency.format(values.expenses)}
             </p>
+            {expenseChange !== null && <p className={`mt-1 text-[11px] font-medium ${expenseChange <= 0 ? "text-income" : "text-expense"}`}>{expenseChange > 0 ? "+" : ""}{expenseChange}% {t("vsLastMonth")}</p>}
           </div>
         </article>
       </div>

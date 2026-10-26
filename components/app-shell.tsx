@@ -1,8 +1,8 @@
 "use client";
 
-import { Activity, Ellipsis, House, Plus, UserRound, WalletCards } from "lucide-react";
+import { Activity, Ellipsis, House, Moon, Plus, Sun, UserRound, WalletCards } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, usePathname } from "@/i18n/navigation";
 
 const primaryLinks = [
@@ -28,15 +28,28 @@ export default function AppShell({
   const navigation = useTranslations("Navigation");
   const actions = useTranslations("Actions");
   const [moreOpen, setMoreOpen] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
+  useEffect(() => {
+    const savedTheme = window.localStorage.getItem("kasku-theme");
+    const nextDark = savedTheme ? savedTheme === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    setDarkMode(nextDark);
+    document.documentElement.dataset.theme = nextDark ? "dark" : "light";
+  }, []);
+  function toggleTheme() {
+    const nextDark = !darkMode;
+    setDarkMode(nextDark);
+    document.documentElement.dataset.theme = nextDark ? "dark" : "light";
+    window.localStorage.setItem("kasku-theme", nextDark ? "dark" : "light");
+  }
   const activeLink = primaryLinks.find((link) => isActivePath(pathname, link.href));
   const activeTitle = navigation(
-    pathname === "/transactions/new"
-      ? "newTransaction"
+    pathname === "/transactions/new" || pathname.endsWith("/edit")
+      ? "brandName"
       : pathname === "/profile"
         ? "profile"
         : activeLink?.messageKey ?? "overview",
   );
-  const moreIsActive = ["/categories", "/reports"].some((href) =>
+  const moreIsActive = ["/categories", "/reports", "/profile"].some((href) =>
     isActivePath(pathname, href),
   );
 
@@ -49,9 +62,9 @@ export default function AppShell({
   }
 
   return (
-    <div className="@container/app mx-auto min-h-dvh w-full max-w-[430px] bg-background text-foreground shadow-[0_0_32px_rgba(25,54,94,0.08)]">
+    <div className="@container/app mx-auto min-h-dvh w-full max-w-[1440px] bg-background text-foreground shadow-[0_0_32px_rgba(25,54,94,0.08)]">
       <div className="flex min-h-dvh min-w-0 flex-col">
-        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-border/80 bg-surface/90 px-5 backdrop-blur-md @sm/app:px-8">
+        <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center justify-between border-b border-border/80 bg-surface/90 px-5 backdrop-blur-md @sm/app:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <div className="min-w-0">
               <p className="hidden text-[10px] font-bold uppercase tracking-[0.14em] text-muted @sm/app:block">
@@ -63,7 +76,10 @@ export default function AppShell({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Link
+            <button type="button" onClick={toggleTheme} aria-label={darkMode ? navigation("lightTheme") : navigation("darkTheme")} title={darkMode ? navigation("lightTheme") : navigation("darkTheme")} className="inline-flex size-9 items-center justify-center rounded-full border border-border bg-surface text-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary">
+              {darkMode ? <Sun aria-hidden="true" className="size-4" /> : <Moon aria-hidden="true" className="size-4" />}
+            </button>
+            {pathname !== "/profile" && <Link
               aria-current={pathname === "/profile" ? "page" : undefined}
               aria-label={navigation("profile")}
               className="inline-flex size-8 items-center justify-center rounded-full border border-border/80 bg-surface text-muted transition-colors hover:bg-background hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
@@ -71,11 +87,11 @@ export default function AppShell({
               title={navigation("profile")}
             >
               <UserRound aria-hidden="true" className="size-4" />
-            </Link>
+            </Link>}
           </div>
         </header>
 
-        <main className="min-w-0 flex-1 pb-24">{children}</main>
+        <main className="min-w-0 flex-1 pb-28">{children}</main>
       </div>
 
       <nav
@@ -102,6 +118,7 @@ export default function AppShell({
               ) : (
                 <Activity aria-hidden="true" className={`size-5 transition-transform ${active ? "scale-105" : ""}`} />
               )}
+              <span>{label}</span>
             </Link>
           );
         })}
@@ -124,11 +141,13 @@ export default function AppShell({
           title={navigation("accounts")}
         >
           <WalletCards aria-hidden="true" className={`size-5 transition-transform ${isActivePath(pathname, "/accounts") ? "scale-105" : ""}`} />
+          <span>{navigation("accounts")}</span>
         </Link>
         <button
           aria-controls="mobile-more-menu"
           aria-expanded={moreOpen}
           aria-label={navigation(moreOpen ? "closeMore" : "openMore")}
+          aria-current={pathname === "/profile" ? "page" : undefined}
           className={`flex flex-col items-center justify-center gap-1 text-[10px] font-semibold transition-colors cursor-pointer ${
             moreIsActive || moreOpen ? "text-primary font-bold" : "text-muted hover:text-foreground"
           } focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-primary`}
@@ -136,6 +155,7 @@ export default function AppShell({
           type="button"
         >
           <Ellipsis aria-hidden="true" className="size-5" />
+          <span>{navigation("more")}</span>
         </button>
       </nav>
 
@@ -161,6 +181,14 @@ export default function AppShell({
               </Link>
             );
           })}
+          <Link
+            aria-current={pathname === "/profile" ? "page" : undefined}
+            className={`flex h-10 items-center rounded-md px-3 text-sm font-medium ${pathname === "/profile" ? "bg-primary-soft text-primary" : "text-foreground hover:bg-background"} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary`}
+            href="/profile"
+            onClick={() => setMoreOpen(false)}
+          >
+            {navigation("profile")}
+          </Link>
         </div>
       )}
     </div>

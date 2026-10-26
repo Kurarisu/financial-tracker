@@ -1,9 +1,10 @@
 "use client";
 
-import { ArrowLeft, CircleAlert, FileImage, Loader2, RotateCcw } from "lucide-react";
+import { CircleAlert, FileImage, Loader2, RotateCcw } from "lucide-react";
 import TransactionFields, { type TransactionFormValues } from "@/components/transaction-fields";
+import PageHeader from "@/components/ui/page-header";
 import { useEffect, useState } from "react";
-import { Link, useRouter } from "@/i18n/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { formatMoneyInput, formatMoneyValue, parseMoneyInput } from "@/lib/money-input";
 
@@ -30,10 +31,14 @@ type TransactionPayload = {
   receipt_token?: string;
 };
 
+function localDateString(date: Date) {
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+}
+
 const initialForm: TransactionFormValues = {
   type: "expense",
   amount: "",
-  transaction_date: new Date().toISOString().slice(0, 10),
+  transaction_date: localDateString(new Date()),
   account_id: "",
   category_id: "",
   to_account_id: "",
@@ -305,24 +310,11 @@ export default function TransactionForm({ transactionId }: { transactionId?: str
   }
 
   return (
-    <div className="mx-auto w-full max-w-[820px] px-5 py-7 @sm/app:px-8 @sm/app:py-9">
-      <div className="mb-6 flex items-center justify-between gap-3">
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted">
-            {t("workspace")}
-          </p>
-          <h2 className="text-2xl font-semibold tracking-normal @sm/app:text-[28px]">
-            {transactionId ? t("editTransaction") : t("newTransaction")}
-          </h2>
-        </div>
-        <Link
-          className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground"
-          href="/transactions"
-        >
-          <ArrowLeft aria-hidden="true" className="size-4" />
-          {t("back")}
-        </Link>
-      </div>
+    <div className="mx-auto w-full max-w-[820px] px-5 pb-7 @sm/app:px-8">
+      <PageHeader
+        title={transactionId ? t("editTransaction") : t("newTransaction")}
+        breadcrumb={transactionId ? t("breadcrumbEdit") : t("breadcrumbNew")}
+      />
 
       <TransactionFields
         accounts={accounts}
@@ -336,20 +328,20 @@ export default function TransactionForm({ transactionId }: { transactionId?: str
         submitLabel={transactionId ? t("updateTransaction") : t("saveTransaction")}
         isUpdate={Boolean(transactionId)}
         receiptSection={transactionId ? null : (
-          <section className="space-y-4 border-t border-border pt-5" aria-label="Tambah struk">
+          <section className="space-y-4 border-t border-border pt-5" aria-label={t("receiptSection")}>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-semibold">Tambah struk</h3>
-                <span className="rounded-full bg-background px-2 py-0.5 text-xs font-medium text-muted">Opsional</span>
+                <h3 className="font-semibold">{t("receiptSection")}</h3>
+                <span className="rounded-full bg-background px-2 py-0.5 text-xs font-medium text-muted">{t("optional")}</span>
               </div>
-              <p className="mt-1 text-sm text-muted">Pindai struk belanja, bukti transfer, invoice, atau kuitansi. Hasil pindai bisa diperiksa dan diubah sebelum transaksi disimpan.</p>
-              <p className="mt-2 text-xs text-muted">Format JPG, PNG, atau WebP · Maksimal 10 MB</p>
+              <p className="mt-1 text-sm text-muted">{t("receiptDescription")}</p>
+              <p className="mt-2 text-xs text-muted">{t("receiptFormats")}</p>
             </div>
             <label className="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-border px-4 py-3 text-center text-sm font-medium hover:bg-background">
-              <FileImage aria-hidden="true" className="size-4 shrink-0" /> {receipt ? "Pilih foto lain" : "Pilih atau ambil foto struk"}
+              <FileImage aria-hidden="true" className="size-4 shrink-0" /> {receipt ? t("chooseAnotherPhoto") : t("chooseReceiptPhoto")}
               <input accept="image/jpeg,image/png,image/webp" capture="environment" className="sr-only" onChange={(event) => {
                 const selected = event.target.files?.[0] ?? null;
-                if (selected && selected.size > 10 * 1024 * 1024) { setError("Ukuran foto struk maksimal 10 MB."); event.target.value = ""; return; }
+                if (selected && selected.size > 10 * 1024 * 1024) { setError(t("receiptTooLarge")); event.target.value = ""; return; }
                 setError("");
                 if (receiptPreview) URL.revokeObjectURL(receiptPreview);
                 setReceipt(selected);
@@ -359,12 +351,12 @@ export default function TransactionForm({ transactionId }: { transactionId?: str
             </label>
             {receiptPreview && <div className="flex flex-wrap items-start gap-4">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img alt="Pratinjau struk" className="max-h-64 max-w-full rounded border border-border object-contain" src={receiptPreview} />
+              <img alt={t("receiptPreview")} className="max-h-64 max-w-full rounded border border-border object-contain" src={receiptPreview} />
               <div className="flex flex-wrap gap-2">
                 <button className="inline-flex h-10 items-center gap-2 rounded-md border border-border px-3 text-sm font-medium disabled:opacity-60" disabled={scanning} onClick={scanReceipt} type="button">
-                  {scanning ? <Loader2 className="size-4 animate-spin" /> : receiptToken ? <RotateCcw className="size-4" /> : null}{scanning ? "Memindai…" : receiptToken ? "Pindai ulang" : "Pindai struk"}
+                  {scanning ? <Loader2 className="size-4 animate-spin" /> : receiptToken ? <RotateCcw className="size-4" /> : null}{scanning ? t("scanningReceipt") : receiptToken ? t("rescanReceipt") : t("scanReceipt")}
                 </button>
-                <button className="h-10 rounded-md px-3 text-sm text-muted underline" disabled={scanning} onClick={clearReceipt} type="button">Hapus foto</button>
+                <button className="h-10 rounded-md px-3 text-sm text-muted underline" disabled={scanning} onClick={clearReceipt} type="button">{t("removePhoto")}</button>
               </div>
             </div>}
             {scanMessage && <p className="text-sm text-green-700">{scanMessage}</p>}

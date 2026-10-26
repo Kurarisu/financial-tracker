@@ -20,6 +20,8 @@ export default function CategoryGroup({
   savingLabel,
   noBudgetLabel,
   spendingChangeLabel,
+  nearBudgetLabel,
+  overBudgetLabel,
 }: {
   title: string;
   empty: string;
@@ -34,16 +36,22 @@ export default function CategoryGroup({
   savingLabel?: string;
   noBudgetLabel?: string;
   spendingChangeLabel?: string;
+  nearBudgetLabel?: string;
+  overBudgetLabel?: string;
 }) {
   return (
-    <section className="rounded-md border border-border bg-surface p-5">
+    <section className="rounded-2xl border border-border bg-surface p-5 shadow-xs">
       <h3 className="mb-4 text-sm font-semibold text-foreground">{title}</h3>
       {categories.length === 0 ? (
         <p className="py-3 text-sm text-muted">{empty}</p>
       ) : (
         <ul className="space-y-3">
-          {categories.map((category) => (
-            <li className="rounded-md border border-border p-4" key={category.id}>
+          {categories.map((category) => {
+            const usedPercentage = Math.max(0, Number(category.budget_used_percentage ?? 0));
+            const isOverBudget = Number(category.monthly_budget ?? 0) > 0 && usedPercentage >= 100;
+            const isNearBudget = Number(category.monthly_budget ?? 0) > 0 && usedPercentage >= 80 && usedPercentage < 100;
+            return (
+            <li className="rounded-xl border border-border p-4" key={category.id}>
               <div className="flex items-center gap-3">
                 <span
                   className="flex size-9 items-center justify-center rounded-md"
@@ -88,7 +96,7 @@ export default function CategoryGroup({
                       {Number(category.monthly_budget) > 0 ? (
                         <div className="h-2 rounded-full bg-background">
                           <div
-                            className="h-2 rounded-full bg-primary"
+                            className={`h-2 rounded-full transition-[width] duration-300 ${isOverBudget ? "bg-expense" : isNearBudget ? "bg-amber-500" : "bg-brand"}`}
                             style={{
                               width: `${Math.min(
                                 100,
@@ -98,6 +106,7 @@ export default function CategoryGroup({
                           />
                         </div>
                       ) : null}
+                      {isOverBudget || isNearBudget ? <p className={`mt-2 text-xs font-semibold ${isOverBudget ? "text-expense" : "text-amber-700"}`} role="status">{isOverBudget ? overBudgetLabel : nearBudgetLabel}</p> : null}
                     </div>
                   ) : (
                     <p className="mt-3 text-xs text-muted">{noBudgetLabel}</p>
@@ -133,7 +142,8 @@ export default function CategoryGroup({
                 </div>
               ) : null}
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </section>

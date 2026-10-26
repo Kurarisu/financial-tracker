@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { ArrowRight, Download, LockKeyhole, ShieldAlert, Trash2, UserRound } from "lucide-react";
+import { ChevronRight, Download, LockKeyhole, ShieldAlert, Trash2, UserRound, type LucideIcon } from "lucide-react";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import LogoutButton from "@/components/logout-button";
@@ -17,6 +17,41 @@ type ApiResponse<T = unknown> = {
 
 function getErrorMessage(result: ApiResponse, fallback: string) {
   return Object.values(result.errors ?? {}).flat()[0] ?? result.message ?? fallback;
+}
+
+function ProfileActionRow({
+  icon: Icon,
+  title,
+  description,
+  onClick,
+  expanded,
+  controls,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  onClick: () => void;
+  expanded: boolean;
+  controls: string;
+}) {
+  return (
+    <button
+      aria-controls={controls}
+      aria-expanded={expanded}
+      className="flex min-h-16 w-full min-w-0 items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors duration-150 hover:bg-background active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      onClick={onClick}
+      type="button"
+    >
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary">
+        <Icon aria-hidden="true" className="size-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold text-foreground">{title}</span>
+        <span className="mt-0.5 block truncate text-xs text-muted">{description}</span>
+      </span>
+      <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-muted" />
+    </button>
+  );
 }
 
 export default function ProfileView() {
@@ -206,91 +241,51 @@ export default function ProfileView() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-5 py-7 @sm/app:px-8 @sm/app:py-9">
-      <header className="mb-6">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted">KasKu</p>
+    <div className="mx-auto w-full max-w-3xl space-y-6 px-5 py-6 @sm/app:px-8 @sm/app:py-8">
+      <header>
+        <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted">KasKu</p>
         <h2 className="text-2xl font-semibold @sm/app:text-[28px]">{t("title")}</h2>
-        <p className="mt-2 text-sm text-muted">{t("subtitle")}</p>
-      </header>
-
-      <div className="space-y-4">
-        <section className="rounded-xl border border-border bg-surface p-5 shadow-sm @sm/app:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex min-w-0 items-center gap-4">
-              <div aria-hidden="true" className="flex size-14 shrink-0 items-center justify-center rounded-full bg-primary-soft text-lg font-bold text-primary">{initials || <UserRound className="size-6" />}</div>
-              <div className="min-w-0">
-                <h3 className="truncate text-lg font-semibold text-foreground">{user.name}</h3>
-                <p className="break-all text-sm text-muted">{user.email}</p>
-              </div>
-            </div>
+        <p className="mt-1 text-sm text-muted">{t("subtitle")}</p>
+        <div className="mt-5 flex min-w-0 items-center gap-3 rounded-2xl border border-border bg-surface p-3 shadow-sm @sm/app:gap-4 @sm/app:p-5">
+          <div aria-hidden="true" className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary-soft text-base font-bold text-primary @sm/app:size-14 @sm/app:text-lg">{initials || <UserRound className="size-6" />}</div>
+          <div className="min-w-0 flex-1"><h3 className="truncate text-base font-semibold text-foreground @sm/app:text-lg">{user.name}</h3><p className="truncate text-xs text-muted @sm/app:text-sm">{user.email}</p></div>
+          <div className="shrink-0">
             <LogoutButton />
           </div>
+        </div>
+      </header>
 
-          <div className="mt-5 flex items-center justify-between gap-3 border-t border-border pt-4">
-            <div>
-              <h4 className="text-sm font-semibold text-foreground">{t("personalInfo")}</h4>
-              <p className="mt-1 text-xs text-muted">{t("personalInfoDescription")}</p>
-            </div>
-            <button className="shrink-0 rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-background" onClick={() => { if (editingProfile) setProfileForm({ name: user.name, email: user.email }); setEditingProfile((open) => !open); setProfileError(""); setProfileMessage(""); }} type="button">{editingProfile ? t("cancel") : t("editProfile")}</button>
-          </div>
+      <section aria-labelledby="profile-account-heading">
+        <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted" id="profile-account-heading">{t("sectionAccount")}</h3>
+        <div className="space-y-3">
+          <section className="rounded-2xl border border-border bg-surface p-2 shadow-sm">
+            <ProfileActionRow icon={UserRound} title={t("personalInfo")} description={t("personalInfoDescription")} expanded={editingProfile} controls="profile-edit-form" onClick={() => { if (editingProfile) setProfileForm({ name: user.name, email: user.email }); setEditingProfile((open) => !open); setProfileError(""); setProfileMessage(""); }} />
+            {profileMessage && <p className="mx-2 mt-2 rounded-md bg-income/10 px-3 py-2 text-sm text-income" role="status">{profileMessage}</p>}
+            {editingProfile && (
+              <form className="space-y-4 border-t border-border px-3 pb-3 pt-4" id="profile-edit-form" onSubmit={handleProfileSubmit}>
+                {profileError && <p className="rounded-md bg-expense/10 px-3 py-2 text-sm text-expense" role="alert">{profileError}</p>}
+                <label className="block space-y-1.5 text-sm font-medium text-foreground"><span>{t("fullName")}</span><input autoComplete="name" className="h-11 w-full rounded-md border border-border bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-primary/30" maxLength={255} onChange={(event) => setProfileForm((form) => ({ ...form, name: event.target.value }))} required value={profileForm.name} /></label>
+                <label className="block space-y-1.5 text-sm font-medium text-foreground"><span>{t("email")}</span><input autoComplete="email" className="h-11 w-full rounded-md border border-border bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-primary/30" onChange={(event) => setProfileForm((form) => ({ ...form, email: event.target.value }))} required type="email" value={profileForm.email} /></label>
+                <button className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-brand px-4 text-sm font-semibold text-white hover:bg-brand-hover disabled:opacity-60" disabled={savingProfile} type="submit">{savingProfile ? t("saving") : t("saveChanges")}</button>
+              </form>
+            )}
+          </section>
 
-          {profileMessage && <p className="mt-4 rounded-md bg-income/10 px-3 py-2 text-sm text-income" role="status">{profileMessage}</p>}
-          {editingProfile && (
-            <form className="mt-4 space-y-4" onSubmit={handleProfileSubmit}>
-              {profileError && <p className="rounded-md bg-expense/10 px-3 py-2 text-sm text-expense" role="alert">{profileError}</p>}
-              <label className="block space-y-1.5 text-sm font-medium text-foreground">
-                <span>{t("fullName")}</span>
-                <input autoComplete="name" className="h-11 w-full rounded-md border border-border bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-primary/30" maxLength={255} onChange={(event) => setProfileForm((form) => ({ ...form, name: event.target.value }))} required value={profileForm.name} />
-              </label>
-              <label className="block space-y-1.5 text-sm font-medium text-foreground">
-                <span>{t("email")}</span>
-                <input autoComplete="email" className="h-11 w-full rounded-md border border-border bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-primary/30" onChange={(event) => setProfileForm((form) => ({ ...form, email: event.target.value }))} required type="email" value={profileForm.email} />
-              </label>
-              <button className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-brand px-4 text-sm font-semibold text-white hover:bg-brand-hover disabled:opacity-60" disabled={savingProfile} type="submit">{savingProfile ? t("saving") : t("saveChanges")}</button>
-            </form>
-          )}
-        </section>
+          <section className="rounded-2xl border border-border bg-surface p-2 shadow-sm">
+            <ProfileActionRow icon={LockKeyhole} title={t("securityTitle")} description={t("securityDescription")} expanded={changingPassword} controls="profile-password-form" onClick={() => { if (changingPassword) setPasswordForm({ current_password: "", password: "", password_confirmation: "" }); setChangingPassword((open) => !open); setPasswordError(""); setPasswordMessage(""); }} />
+            {passwordMessage && <p className="mx-2 mt-2 rounded-md bg-income/10 px-3 py-2 text-sm text-income" role="status">{passwordMessage}</p>}
+            {changingPassword && (
+              <form className="space-y-4 border-t border-border px-3 pb-3 pt-4" id="profile-password-form" onSubmit={handlePasswordSubmit}>
+                {passwordError && <p className="rounded-md bg-expense/10 px-3 py-2 text-sm text-expense" role="alert">{passwordError}</p>}
+                <label className="block space-y-1.5 text-sm font-medium text-foreground"><span>{t("currentPassword")}</span><input autoComplete="current-password" className="h-11 w-full rounded-md border border-border bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-primary/30" onChange={(event) => setPasswordForm((form) => ({ ...form, current_password: event.target.value }))} required type="password" value={passwordForm.current_password} /></label>
+                <label className="block space-y-1.5 text-sm font-medium text-foreground"><span>{t("newPassword")}</span><input autoComplete="new-password" className="h-11 w-full rounded-md border border-border bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-primary/30" minLength={8} onChange={(event) => setPasswordForm((form) => ({ ...form, password: event.target.value }))} required type="password" value={passwordForm.password} /></label>
+                <label className="block space-y-1.5 text-sm font-medium text-foreground"><span>{t("confirmPassword")}</span><input autoComplete="new-password" className="h-11 w-full rounded-md border border-border bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-primary/30" onChange={(event) => setPasswordForm((form) => ({ ...form, password_confirmation: event.target.value }))} required type="password" value={passwordForm.password_confirmation} /></label>
+                <button className="inline-flex h-10 items-center justify-center rounded-md bg-brand px-4 text-sm font-semibold text-white hover:bg-brand-hover disabled:opacity-60" disabled={savingPassword} type="submit">{savingPassword ? t("saving") : t("saveChanges")}</button>
+              </form>
+            )}
+          </section>
 
-        <section className="rounded-xl border border-border bg-surface p-5 shadow-sm @sm/app:p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex gap-3">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary"><LockKeyhole aria-hidden="true" className="size-5" /></span>
-              <div><h3 className="font-semibold text-foreground">{t("securityTitle")}</h3><p className="mt-1 text-sm text-muted">{t("securityDescription")}</p></div>
-            </div>
-            <button className="shrink-0 rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-background" onClick={() => { if (changingPassword) setPasswordForm({ current_password: "", password: "", password_confirmation: "" }); setChangingPassword((open) => !open); setPasswordError(""); setPasswordMessage(""); }} type="button">{changingPassword ? t("cancel") : t("changePassword")}</button>
-          </div>
-          {passwordMessage && <p className="mt-4 rounded-md bg-income/10 px-3 py-2 text-sm text-income" role="status">{passwordMessage}</p>}
-          {changingPassword && (
-            <form className="mt-4 space-y-4 border-t border-border pt-4" onSubmit={handlePasswordSubmit}>
-              {passwordError && <p className="rounded-md bg-expense/10 px-3 py-2 text-sm text-expense" role="alert">{passwordError}</p>}
-              <label className="block space-y-1.5 text-sm font-medium text-foreground"><span>{t("currentPassword")}</span><input autoComplete="current-password" className="h-11 w-full rounded-md border border-border bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-primary/30" onChange={(event) => setPasswordForm((form) => ({ ...form, current_password: event.target.value }))} required type="password" value={passwordForm.current_password} /></label>
-              <label className="block space-y-1.5 text-sm font-medium text-foreground"><span>{t("newPassword")}</span><input autoComplete="new-password" className="h-11 w-full rounded-md border border-border bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-primary/30" minLength={8} onChange={(event) => setPasswordForm((form) => ({ ...form, password: event.target.value }))} required type="password" value={passwordForm.password} /></label>
-              <label className="block space-y-1.5 text-sm font-medium text-foreground"><span>{t("confirmPassword")}</span><input autoComplete="new-password" className="h-11 w-full rounded-md border border-border bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-primary/30" onChange={(event) => setPasswordForm((form) => ({ ...form, password_confirmation: event.target.value }))} required type="password" value={passwordForm.password_confirmation} /></label>
-              <button className="inline-flex h-10 items-center justify-center rounded-md bg-brand px-4 text-sm font-semibold text-white hover:bg-brand-hover disabled:opacity-60" disabled={savingPassword} type="submit">{savingPassword ? t("saving") : t("saveChanges")}</button>
-            </form>
-          )}
-        </section>
-
-        <section className="flex items-center justify-between gap-4 rounded-xl border border-border bg-surface p-5 shadow-sm @sm/app:p-6">
-          <div className="flex gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary"><Download aria-hidden="true" className="size-5" /></span><div><h3 className="font-semibold text-foreground">{t("dataTitle")}</h3><p className="mt-1 text-sm text-muted">{t("dataDescription")}</p></div></div>
-          <Link className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-2 text-sm font-semibold text-primary hover:bg-primary/5" href="/reports">{t("openReports")}<ArrowRight aria-hidden="true" className="size-4" /></Link>
-        </section>
-
-        <section className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-surface p-5 shadow-sm @sm/app:p-6">
-          <div><h3 className="font-semibold text-foreground">{t("preferencesTitle")}</h3><p className="mt-1 text-sm text-muted">{t("preferencesDescription")}</p></div>
-          <fieldset>
-            <legend className="sr-only">{t("language")}</legend>
-            <div aria-label={t("language")} className="inline-flex rounded-lg border border-border bg-background p-1" role="group">
-              {(["en", "id"] as const).map((option) => (
-                <button aria-pressed={locale === option} className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors ${locale === option ? "bg-primary text-white" : "text-muted hover:text-foreground"}`} key={option} onClick={() => handleLanguageChange(option)} type="button">
-                  {t(option === "en" ? "english" : "indonesian")}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-        </section>
-
-        <section className="rounded-xl border border-expense/30 bg-surface p-5 shadow-sm @sm/app:p-6">
+          <section className="rounded-2xl border border-expense/30 bg-surface p-4 shadow-sm @sm/app:p-5">
           <div className="flex gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-expense/10 text-expense"><ShieldAlert aria-hidden="true" className="size-5" /></span><div><h3 className="font-semibold text-foreground">{t("deleteTitle")}</h3><p className="mt-1 text-sm text-muted">{t("deleteDescription")}</p></div></div>
           {!deletingAccount ? (
             <button className="mt-4 inline-flex h-10 items-center gap-2 rounded-md border border-expense/40 px-4 text-sm font-semibold text-expense hover:bg-expense/5" onClick={() => { setDeletingAccount(true); setDeleteError(""); }} type="button"><Trash2 aria-hidden="true" className="size-4" />{t("deleteAccount")}</button>
@@ -302,8 +297,33 @@ export default function ProfileView() {
               <div className="flex flex-wrap gap-2"><button className="inline-flex h-10 items-center justify-center rounded-md bg-expense px-4 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60" disabled={savingDelete} type="submit">{savingDelete ? t("deleting") : t("confirmDelete")}</button><button className="inline-flex h-10 items-center justify-center rounded-md border border-border px-4 text-sm font-medium text-foreground hover:bg-background" disabled={savingDelete} onClick={() => { setDeletingAccount(false); setDeletePassword(""); setDeleteError(""); }} type="button">{t("cancel")}</button></div>
             </form>
           )}
-        </section>
-      </div>
+          </section>
+        </div>
+      </section>
+
+      <section aria-labelledby="profile-data-heading">
+        <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted" id="profile-data-heading">{t("sectionData")}</h3>
+        <Link className="flex min-h-16 w-full items-center gap-3 rounded-2xl border border-border bg-surface p-3 shadow-sm transition-colors duration-150 hover:bg-background active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" href="/reports">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary"><Download aria-hidden="true" className="size-5" /></span>
+          <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-foreground">{t("dataTitle")}</span><span className="mt-0.5 block truncate text-xs text-muted">{t("dataDescription")}</span></span>
+          <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-muted" />
+        </Link>
+      </section>
+
+      <section aria-labelledby="profile-preferences-heading">
+        <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted" id="profile-preferences-heading">{t("sectionPreferences")}</h3>
+        <div className="flex flex-col gap-4 rounded-2xl border border-border bg-surface p-4 shadow-sm @sm/app:flex-row @sm/app:items-center @sm/app:justify-between @sm/app:p-5">
+          <div className="min-w-0"><h4 className="text-sm font-semibold text-foreground">{t("preferencesTitle")}</h4><p className="mt-1 text-sm text-muted">{t("preferencesDescription")}</p></div>
+          <fieldset className="shrink-0">
+            <legend className="sr-only">{t("language")}</legend>
+            <div aria-label={t("language")} className="inline-flex rounded-lg border border-border bg-background p-1" role="group">
+              {(["en", "id"] as const).map((option) => (
+                <button aria-pressed={locale === option} className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors ${locale === option ? "bg-primary text-white" : "text-muted hover:text-foreground"}`} key={option} onClick={() => handleLanguageChange(option)} type="button">{t(option === "en" ? "english" : "indonesian")}</button>
+              ))}
+            </div>
+          </fieldset>
+        </div>
+      </section>
     </div>
   );
 }

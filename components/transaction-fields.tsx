@@ -1,11 +1,12 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Loader2 } from "lucide-react";
 import LoadingBar from "@/components/ui/loading-bar";
 import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { formatMoneyInput } from "@/lib/money-input";
 import type { ReactNode } from "react";
+import CategoryPicker from "@/components/categories/category-picker";
 
 type Account = { id: number; name: string; type?: string; account_number?: string | null };
 type Category = { id: number; name: string; type?: string };
@@ -48,7 +49,7 @@ export default function TransactionFields({
   const isTransfer = form.type === "transfer";
   const updateField = onFieldChange;
   return (
-    <form className="space-y-5 rounded-md border border-border bg-surface p-5 @sm/app:p-6" onSubmit={onSubmit}>
+    <form className="space-y-6 rounded-2xl border border-border bg-surface p-4 shadow-xs @sm/app:p-6" onSubmit={onSubmit}>
         {(loadingOptions || saving) && <LoadingBar className="mb-2" />}
         {error ? (
           <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -56,32 +57,30 @@ export default function TransactionFields({
           </div>
         ) : null}
 
-        <div className="grid gap-5 @md/app:grid-cols-2">
-          <label className="space-y-2 text-sm font-medium text-foreground">
-            <span>{t("type")}</span>
-            <select
-              className="h-11 w-full rounded-md border border-border bg-background px-3 text-sm outline-none"
-              onChange={(event) => updateField("type", event.target.value)}
-              value={form.type}
-            >
-              <option value="expense">{t("filterExpense")}</option>
-              <option value="income">{t("filterIncome")}</option>
-              <option value="transfer">{t("filterTransfer")}</option>
-            </select>
-          </label>
+        <fieldset>
+          <legend className="mb-2 text-sm font-semibold text-foreground">{t("type")}</legend>
+          <div className="grid grid-cols-3 gap-2" role="group" aria-label={t("type")}>
+            {(["expense", "income", "transfer"] as const).map((type) => {
+              const Icon = type === "income" ? ArrowDownLeft : type === "expense" ? ArrowUpRight : ArrowLeftRight;
+              const label = type === "income" ? t("filterIncome") : type === "expense" ? t("filterExpense") : t("filterTransfer");
+              return <button key={type} aria-pressed={form.type === type} type="button" onClick={() => updateField("type", type)} className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border px-2 text-xs font-semibold transition-colors @sm/app:text-sm ${form.type === type ? type === "income" ? "border-income bg-income/10 text-income" : type === "expense" ? "border-expense bg-expense/10 text-expense" : "border-primary bg-primary-soft text-primary" : "border-border bg-background text-muted hover:text-foreground"}`}><Icon aria-hidden="true" className="size-4" />{label}</button>;
+            })}
+          </div>
+        </fieldset>
 
-          <label className="space-y-2 text-sm font-medium text-foreground">
-            <span>{t("amount")}</span>
+        <label className="block rounded-2xl border border-border bg-background p-4 @sm/app:p-5">
+            <span className="text-sm font-medium text-muted">{t("amount")}</span>
             <input
-              className="h-11 w-full rounded-md border border-border bg-background px-3 text-sm outline-none"
+              aria-label={t("amount")}
+              aria-invalid={Boolean(error)}
+              className="mt-2 h-16 w-full border-0 bg-transparent px-0 text-4xl font-bold tracking-tight text-foreground tabular-nums outline-none placeholder:text-muted/50 focus-visible:ring-0 @sm/app:text-5xl"
               inputMode="decimal"
               onChange={(event) => updateField("amount", formatMoneyInput(event.target.value))}
               placeholder="0"
               type="text"
               value={form.amount}
             />
-          </label>
-        </div>
+        </label>
 
         <div className="grid gap-5 @md/app:grid-cols-2">
           <label className="space-y-2 text-sm font-medium text-foreground">
@@ -130,27 +129,14 @@ export default function TransactionFields({
             </select>
           </label>
         ) : (
-          <label className="block space-y-2 text-sm font-medium text-foreground">
-            <span>{t("category")}</span>
-            <select
-              className="h-11 w-full rounded-md border border-border bg-background px-3 text-sm outline-none"
-              onChange={(event) => updateField("category_id", event.target.value)}
-              disabled={categories.length === 0}
-              value={form.category_id}
-            >
-              <option value="">{categories.length === 0 ? t("noCategories") : t("selectCategory")}</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
+          <div>
+            <CategoryPicker categories={categories} selectedId={form.category_id} onSelect={(id) => updateField("category_id", id)} />
             {categories.length === 0 ? (
               <p className="text-xs font-normal text-muted">
                 {t("createCategoryFirst")} <Link className="font-semibold text-primary underline underline-offset-2" href="/categories">{t("createCategoryLink")}</Link>
               </p>
             ) : null}
-          </label>
+          </div>
         )}
 
         <label className="block space-y-2 text-sm font-medium text-foreground">

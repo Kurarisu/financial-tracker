@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, Pencil, SlidersHorizontal, X } from "lucide-react";
+import { ChevronDown, SlidersHorizontal, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { Link } from "@/i18n/navigation";
@@ -189,6 +189,14 @@ export default function TransactionsView() {
     }
     return (left.notes ?? "").localeCompare(right.notes ?? "", undefined, { sensitivity: "base" });
   }), [sortBy, visibleTransactions]);
+  const groupedTransactions = useMemo(() => {
+    const groups = new Map<string, TransactionRecord[]>();
+    for (const transaction of sortedTransactions) {
+      const date = (transaction.transaction_date ?? transaction.date ?? "").slice(0, 10);
+      groups.set(date, [...(groups.get(date) ?? []), transaction]);
+    }
+    return [...groups.entries()];
+  }, [sortedTransactions]);
 
   const activeFilterCount = [
     search.trim(),
@@ -230,7 +238,7 @@ export default function TransactionsView() {
         </div>
       </div>
 
-      <section className="rounded-md border border-border bg-surface p-4 @sm/app:p-5">
+      <section className="rounded-2xl border border-border bg-surface p-4 shadow-xs @sm/app:p-5">
         <div className="overflow-x-auto">
           <div className="flex min-w-max items-center gap-2 pb-1">
             {(["all", "income", "expense", "transfer"] as const).map((filter) => (
@@ -318,7 +326,7 @@ export default function TransactionsView() {
         )}
       </section>
 
-      <section className="mt-5 overflow-hidden rounded-md border border-border bg-surface">
+      <section className="mt-5 rounded-2xl border border-border bg-surface shadow-xs">
         {loading ? (
           <div>
             <LoadingBar />
@@ -349,7 +357,7 @@ export default function TransactionsView() {
             </button>
           </div>
         ) : visibleTransactions.length === 0 ? (
-          <div className="px-4 py-8 text-sm text-muted">{t("emptyState")}</div>
+          <div className="flex flex-col items-center px-5 py-12 text-center"><span className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-primary-soft text-primary"><SlidersHorizontal aria-hidden="true" className="size-5" /></span><p className="text-sm font-semibold text-foreground">{t("emptyState")}</p><p className="mt-1 max-w-xs text-sm text-muted">{t("emptyStateHint")}</p><button className="mt-4 text-sm font-semibold text-primary underline underline-offset-4" onClick={clearFilters} type="button">{t("clearFilters")}</button><Link href="/transactions/new" className="mt-4 inline-flex h-10 items-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-white hover:bg-brand-hover"><span aria-hidden="true">+</span>{t("addTransaction")}</Link></div>
         ) : (
           <>
             <div className="hidden grid-cols-[1.4fr_1fr_1fr_0.9fr] border-b border-border px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted @md/app:grid">
@@ -360,7 +368,11 @@ export default function TransactionsView() {
             </div>
 
             <div className="divide-y divide-border">
-              {sortedTransactions.map((transaction) => {
+              {groupedTransactions.map(([groupDate, groupItems]) => (
+                <section key={groupDate} className="px-4 py-2">
+                  <h3 className="relative z-0 border-b border-border/70 bg-surface px-2 py-2 text-xs font-semibold capitalize text-muted">{new Intl.DateTimeFormat(locale === "id" ? "id-ID" : "en-US", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${groupDate}T00:00:00Z`))}</h3>
+                  <div className="divide-y divide-border/70">
+              {groupItems.map((transaction) => {
                 const type = normalizeTransactionType(transaction.type);
                 const amount = Number(transaction.amount ?? 0);
                 const accountName =
@@ -373,7 +385,7 @@ export default function TransactionsView() {
 
                 return (
                   <div
-                    className="grid gap-3 px-4 py-4 @md/app:grid-cols-[1.4fr_1fr_1fr_0.9fr] @md/app:items-center"
+                    className="grid gap-3 rounded-xl px-2 py-4 transition-colors hover:bg-background/60 @md/app:grid-cols-[1.4fr_1fr_1fr_0.9fr] @md/app:items-center"
                     key={transaction.id}
                   >
                     <div>
@@ -397,12 +409,10 @@ export default function TransactionsView() {
                     </div>
 
                     <div className="text-sm text-muted">{accountName}</div>
-                    <div className="text-sm text-muted">
-                      {new Date(transactionDate).toLocaleDateString(locale === "id" ? "id-ID" : "en-US", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        year: "numeric",
-                      })}
+                    <div className="hidden text-sm text-muted @md/app:block">
+                      {new Intl.DateTimeFormat(locale === "id" ? "id-ID" : "en-US", {
+                        day: "numeric", month: "short", year: "numeric", timeZone: "UTC",
+                      }).format(new Date(`${transactionDate.slice(0, 10)}T00:00:00Z`))}
                     </div>
 
                     <div className="flex items-center justify-between gap-2 @md/app:justify-end">
@@ -420,17 +430,19 @@ export default function TransactionsView() {
                       </p>
                       <Link
                         aria-label={`${t("edit")} ${description}`}
-                        className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                        className="inline-flex min-h-10 shrink-0 items-center rounded-lg px-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/5 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                         href={`/transactions/${transaction.id}/edit`}
                         title={t("edit")}
                       >
-                        <Pencil aria-hidden="true" className="size-3.5" />
                         {t("edit")}
                       </Link>
                     </div>
                   </div>
                 );
               })}
+                  </div>
+                </section>
+              ))}
             </div>
           </>
         )}

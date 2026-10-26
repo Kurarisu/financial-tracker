@@ -306,6 +306,8 @@ export default function CategoriesView() {
             saveBudgetLabel={t("saveBudget")}
             savingLabel={t("saving")}
             noBudgetLabel={t("budgetNotSet")}
+            nearBudgetLabel={t("budgetNearLimit")}
+            overBudgetLabel={t("budgetExceeded")}
           />
           <CategoryGroup
             title={t("income")}

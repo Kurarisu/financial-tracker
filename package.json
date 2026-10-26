@@ -18,6 +18,7 @@
     "react-dom": "19.2.8"
   },
   "optionalDependencies": {
+    "@parcel/watcher-linux-x64-glibc": "^2.6.0",
     "@parcel/watcher-win32-x64": "^2.6.0"
   },
   "devDependencies": {
